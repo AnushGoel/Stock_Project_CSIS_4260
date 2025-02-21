@@ -57,7 +57,80 @@ This project integrates **research, benchmarking, and coding** using a time-seri
 
 ### ✅ Prerequisites
 
-Ensure you have **Python 3.x** and the required libraries:
+Ensure you have **Python 3.x** and install the required libraries:
 
 ```bash
-pip install pandas polars pyarrow streamlit dash reflex
+pip install -r requirements.txt
+```
+
+---
+
+## 📂 Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/AnushGoel/Stock_Project_CSIS_4290.git
+cd Stock_Project_CSIS_4290
+pip install -r requirements.txt
+```
+
+---
+
+## ▶️ Running the Project
+
+### **1️⃣ Data Storage & Benchmarking**
+Run the notebook for **Part A**:
+```bash
+jupyter notebook PartA.ipynb
+```
+
+### **2️⃣ Data Analysis & Model Training**
+Run the notebook for **Part B**:
+```bash
+jupyter notebook PartB.ipynb
+```
+
+### **3️⃣ Running the Dashboard**
+Launch the **Streamlit dashboard**:
+```bash
+streamlit run dashboard.py
+```
+or
+```bash
+python dashboard.py
+```
+
+---
+
+## 📁 Project Structure
+
+```bash
+Stock_Project_CSIS_4290/
+├── data/                   # Dataset (CSV/Parquet)
+├── PartA.ipynb             # Notebook for Part 1 (Storage & Retrieval)
+├── PartB.ipynb             # Notebook for Part 2 (Data Analysis & Modeling)
+├── dashboard.py            # Dashboard application file
+├── requirements.txt        # Dependencies
+└── README.md               # Project overview
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Open an issue or submit a pull request for improvements.
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License**.
+
+---
+
+## 📢 Acknowledgments
+
+- **Course:** CSIS 4260  
+- **Instructor:** [Instructor Name]  
+- **Dataset:** Provided by the course  
