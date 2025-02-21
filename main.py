@@ -14,10 +14,10 @@ theme = "plotly_dark" if theme_mode == "Dark Mode" else "plotly_white"
 @st.cache_data
 def load_stock_data(file_path):
     df = pd.read_parquet(file_path)
-    # Rename columns as needed. Adjust if your file uses different cases.
+    # Rename columns if necessary; adjust as needed for your dataset
     df.rename(columns={'date': 'Date', 'close': 'Close', 'volume': 'Volume'}, inplace=True)
-    # Convert Date column to datetime and then to date objects
-    df['Date'] = pd.to_datetime(df['Date']).dt.date  
+    # Convert Date column to datetime (this keeps time info for Plotly)
+    df['Date'] = pd.to_datetime(df['Date'])
     df.set_index('Date', inplace=True)
     return df
 
@@ -25,7 +25,10 @@ df = load_stock_data('scaled_dataset_1x_snappy.parquet')
 
 # ========================== Filter Companies with at Least 6 Months of Data ==========================
 min_required_days = 126  # Approximately 6 months of trading days
-valid_companies = [company for company in df['name'].unique() if len(df[df['name'] == company]) >= min_required_days]
+valid_companies = [
+    company for company in df['name'].unique()
+    if len(df[df['name'] == company]) >= min_required_days
+]
 df = df[df['name'].isin(valid_companies)]
 
 # ========================== Sidebar Options ==========================
@@ -35,35 +38,15 @@ company = st.sidebar.selectbox("Select Company", company_list)
 forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=126, step=5)
 company_data = df[df['name'] == company].sort_index()
 
-# Ensure that OHLC and Volume columns are numeric.
-# If your dataset has different column names for open, high, or low, adjust accordingly.
+# ========================== Ensure Numeric Data for OHLC & Volume ==========================
 numeric_columns = ['open', 'high', 'low', 'Close', 'Volume']
 for col in numeric_columns:
     if col in company_data.columns:
         company_data[col] = pd.to_numeric(company_data[col], errors='coerce')
 
-# ========================== Faster XGBoost Model for Forecasting ==========================
-def train_xgboost_model(data, forecast_days):
-    data_values = data['Close'].values
-    X, y = [], []
-    for i in range(len(data_values) - forecast_days):
-        X.append(data_values[i:i+forecast_days])
-        y.append(data_values[i+forecast_days])
-    X, y = np.array(X), np.array(y)
-    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
-    model.fit(X, y)
-    return model
-
-# ========================== Generate Summary Based on Predicted vs Past Prices ==========================
-def generate_price_summary(past_prices, predicted_prices):
-    actual_change = past_prices[-1] - past_prices[0]
-    predicted_change = predicted_prices[-1] - predicted_prices[0]
-    past_trend = "an upward trend" if actual_change > 0 else "a downward trend"
-    future_trend = "expected to continue rising" if predicted_change > 0 else "expected to decline further"
-    return (
-        f"The stock price has shown {past_trend} over the past period. "
-        f"Based on the forecast, the price is {future_trend} in the upcoming days."
-    )
+# ========================== Prepare Data for Candlestick Chart ==========================
+# Drop any rows with missing OHLC values to prevent plotting errors.
+candlestick_data = company_data.dropna(subset=['open', 'high', 'low', 'Close'])
 
 # ========================== UI with Tabs ==========================
 tab1, tab2, tab3 = st.tabs(["📈 Stock Analysis", "🔮 Forecasted Results", "💰 Portfolio Simulator"])
@@ -71,32 +54,32 @@ tab1, tab2, tab3 = st.tabs(["📈 Stock Analysis", "🔮 Forecasted Results", "�
 with tab1:
     st.subheader(f"📊 {company} - Stock Analysis")
     
-    # Animated Line Chart with Historical Close Prices
+    # --- Historical Line Chart ---
     fig_trend = px.line(
-        company_data, 
-        x=company_data.index, 
-        y="Close", 
-        title=f"{company} Stock Price Trend", 
+        company_data,
+        x=company_data.index,
+        y="Close",
+        title=f"{company} Stock Price Trend",
         template=theme
     )
     fig_trend.update_traces(line=dict(width=2), mode='lines+markers')
     fig_trend.update_layout(hovermode="x unified")
     st.plotly_chart(fig_trend, use_container_width=True)
-
-    # Interactive Candlestick Chart with Volume
-    # Convert index (which is a date) to datetime for Plotly
-    dates = pd.to_datetime(company_data.index)
+    
+    # --- Candlestick Chart with Volume ---
+    dates = candlestick_data.index  # already in datetime format
     fig_candle = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2, 
-        row_heights=[0.7, 0.3], subplot_titles=("Candlestick Chart", "Volume")
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2,
+        row_heights=[0.7, 0.3],
+        subplot_titles=("Candlestick Chart", "Volume")
     )
     
     fig_candle.add_trace(go.Candlestick(
         x=dates,
-        open=company_data['open'],
-        high=company_data['high'],
-        low=company_data['low'],
-        close=company_data['Close'],
+        open=candlestick_data['open'],
+        high=candlestick_data['high'],
+        low=candlestick_data['low'],
+        close=candlestick_data['Close'],
         name="Candlestick",
         hovertemplate=(
             "Date: %{x}<br>" +
@@ -109,7 +92,7 @@ with tab1:
     
     fig_candle.add_trace(go.Bar(
         x=dates,
-        y=company_data['Volume'],
+        y=candlestick_data['Volume'],
         name="Volume",
         marker_color='blue',
         opacity=0.6
@@ -122,8 +105,9 @@ with tab1:
         hovermode="x unified"
     )
     st.plotly_chart(fig_candle, use_container_width=True)
-
-    # Technical Indicators Calculations
+    
+    # --- Technical Indicators ---
+    # RSI
     company_data['RSI'] = 100 - (100 / (1 + (
         company_data['Close'].diff().where(company_data['Close'].diff() > 0, 0)
         .rolling(window=14).mean() /
@@ -131,37 +115,39 @@ with tab1:
         .abs().rolling(window=14).mean()
     )))
     
+    # Williams %R
     company_data['Williams %R'] = (
         (company_data['high'].rolling(14).max() - company_data['Close']) /
         (company_data['high'].rolling(14).max() - company_data['low'].rolling(14).min())
     ) * -100
-
+    
+    # Bollinger Bands
     company_data['SMA_20'] = company_data['Close'].rolling(window=20).mean()
     company_data['Upper_Band'] = company_data['SMA_20'] + (company_data['Close'].rolling(window=20).std() * 2)
     company_data['Lower_Band'] = company_data['SMA_20'] - (company_data['Close'].rolling(window=20).std() * 2)
-
+    
     fig_rsi = px.line(
-        company_data, 
-        x=company_data.index, 
-        y="RSI", 
-        title="RSI (Relative Strength Index)", 
+        company_data,
+        x=company_data.index,
+        y="RSI",
+        title="RSI (Relative Strength Index)",
         template=theme
     )
     fig_williams = px.line(
-        company_data, 
-        x=company_data.index, 
-        y="Williams %R", 
-        title="Williams %R Indicator", 
+        company_data,
+        x=company_data.index,
+        y="Williams %R",
+        title="Williams %R Indicator",
         template=theme
     )
     fig_bollinger = px.line(
-        company_data, 
-        x=company_data.index, 
-        y=["Close", "Upper_Band", "Lower_Band"], 
-        title="Bollinger Bands", 
+        company_data,
+        x=company_data.index,
+        y=["Close", "Upper_Band", "Lower_Band"],
+        title="Bollinger Bands",
         template=theme
     )
-
+    
     st.plotly_chart(fig_rsi, use_container_width=True)
     st.plotly_chart(fig_williams, use_container_width=True)
     st.plotly_chart(fig_bollinger, use_container_width=True)
@@ -169,6 +155,18 @@ with tab1:
 with tab2:
     st.subheader("🔮 Stock Price Forecast")
     st.write(f"📅 Forecasting **{forecast_days} days** ahead for **{company}**.")
+    
+    # --- XGBoost Forecast Model ---
+    def train_xgboost_model(data, forecast_days):
+        data_values = data['Close'].values
+        X, y = [], []
+        for i in range(len(data_values) - forecast_days):
+            X.append(data_values[i:i+forecast_days])
+            y.append(data_values[i+forecast_days])
+        X, y = np.array(X), np.array(y)
+        model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
+        model.fit(X, y)
+        return model
     
     model = train_xgboost_model(company_data, forecast_days)
     future_predictions = []
@@ -179,9 +177,19 @@ with tab2:
         future_predictions.append(round(pred, 2))
         input_data = np.roll(input_data, -1)
         input_data[0, -1] = pred
-
+    
+    def generate_price_summary(past_prices, predicted_prices):
+        actual_change = past_prices[-1] - past_prices[0]
+        predicted_change = predicted_prices[-1] - predicted_prices[0]
+        past_trend = "an upward trend" if actual_change > 0 else "a downward trend"
+        future_trend = "expected to continue rising" if predicted_change > 0 else "expected to decline further"
+        return (
+            f"The stock price has shown {past_trend} over the past period. "
+            f"Based on the forecast, the price is {future_trend} in the upcoming days."
+        )
+    
     summary = generate_price_summary(
-        company_data['Close'].values[-forecast_days:], 
+        company_data['Close'].values[-forecast_days:],
         future_predictions
     )
     
@@ -189,8 +197,8 @@ with tab2:
     st.write(summary)
     
     forecast_index = pd.date_range(
-        start=pd.to_datetime(list(company_data.index)[-1]),
-        periods=forecast_days+1, 
+        start=company_data.index[-1],
+        periods=forecast_days+1,
         closed='right'
     )
     forecast_df = pd.DataFrame({
@@ -200,7 +208,7 @@ with tab2:
     
     fig_forecast = go.Figure()
     fig_forecast.add_trace(go.Scatter(
-        x=list(company_data.index),
+        x=company_data.index,
         y=company_data['Close'],
         mode='lines',
         name='Historical Close'
@@ -211,7 +219,10 @@ with tab2:
         mode='lines+markers',
         name='Forecasted Close'
     ))
-    fig_forecast.update_layout(title=f"{company} Forecast vs Historical Close", template=theme)
+    fig_forecast.update_layout(
+        title=f"{company} Forecast vs Historical Close",
+        template=theme
+    )
     st.plotly_chart(fig_forecast, use_container_width=True)
 
 with tab3:
