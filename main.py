@@ -4,11 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
 import xgboost as xgb
 from statsmodels.tsa.seasonal import seasonal_decompose
-from sklearn.preprocessing import MinMaxScaler
 from datetime import timedelta
+from sklearn.preprocessing import MinMaxScaler
 
 # ========================== Load Parquet File ==========================
 @st.cache_data
@@ -36,30 +35,6 @@ forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=126, 
 
 # Filter Data for Selected Company
 company_data = df[df['name'] == company]
-
-# ========================== Technical Indicators ==========================
-def add_technical_indicators(data):
-    # RSI Calculation
-    delta = data['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    data['RSI'] = 100 - (100 / (1 + rs))
-
-    # MACD Calculation
-    short_ema = data['Close'].ewm(span=12, adjust=False).mean()
-    long_ema = data['Close'].ewm(span=26, adjust=False).mean()
-    data['MACD'] = short_ema - long_ema
-    data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
-
-    # Bollinger Bands
-    data['SMA_20'] = data['Close'].rolling(window=20).mean()
-    data['Upper_Band'] = data['SMA_20'] + (data['Close'].rolling(window=20).std() * 2)
-    data['Lower_Band'] = data['SMA_20'] - (data['Close'].rolling(window=20).std() * 2)
-
-    return data
-
-company_data = add_technical_indicators(company_data)
 
 # ========================== Faster XGBoost Model for Forecasting ==========================
 def train_xgboost_model(data, forecast_days):
@@ -91,13 +66,6 @@ with tab1:
     fig.update_layout(title=f"{company} Candlestick Chart", xaxis_rangeslider_visible=False)
     st.plotly_chart(fig)
 
-    # RSI & MACD Chart
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2)
-    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['RSI'], mode='lines', name="RSI"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['MACD'], mode='lines', name="MACD"), row=2, col=1)
-    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['Signal'], mode='lines', name="Signal"), row=2, col=1)
-    st.plotly_chart(fig)
-
     # Seasonal Decomposition Plot
     decomposition = seasonal_decompose(company_data['Close'], model='multiplicative', period=30)
     fig, axs = plt.subplots(3, figsize=(12, 8))
@@ -117,13 +85,20 @@ with tab2:
     st.write("🔄 Training XGBoost model, please wait...")
     model = train_xgboost_model(company_data, forecast_days)
 
-    # ✅ Generate future dates
-    last_date = company_data.index[-1]
-    future_dates = [last_date + timedelta(days=i) for i in range(1, forecast_days + 1)]
+    # ✅ Generate future predictions properly
+    future_predictions = []
+    input_data = company_data['Close'].values[-forecast_days:].reshape(1, -1)
 
-    # ✅ Get forecasted closing prices
-    last_prices = company_data['Close'].values[-forecast_days:].reshape(1, -1)
-    future_predictions = model.predict(last_prices).flatten()
+    for _ in range(forecast_days):
+        pred = model.predict(input_data)[0]  # Predict next value
+        future_predictions.append(pred)
+
+        # Shift input window: remove first value, add new prediction
+        input_data = np.roll(input_data, -1)
+        input_data[0, -1] = pred
+
+    # ✅ Ensure `future_dates` matches the length of `future_predictions`
+    future_dates = [company_data.index[-1] + timedelta(days=i) for i in range(1, len(future_predictions) + 1)]
 
     # ✅ Create forecast dataframe
     forecast_df = pd.DataFrame({'Date': future_dates, 'Predicted Close Price': future_predictions})
