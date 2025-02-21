@@ -67,7 +67,6 @@ with tab1:
     st.plotly_chart(fig_trend, use_container_width=True)
     
     # --- OHLC Chart with Volume ---
-    # Using go.Ohlc instead of go.Candlestick for an alternative visualization.
     fig_ohlc = make_subplots(
         rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2,
         row_heights=[0.7, 0.3],
@@ -102,7 +101,7 @@ with tab1:
     st.plotly_chart(fig_ohlc, use_container_width=True)
     
     # --- Technical Indicators ---
-    # RSI
+    # RSI Calculation
     company_data['RSI'] = 100 - (100 / (1 + (
         company_data['Close'].diff().where(company_data['Close'].diff() > 0, 0)
         .rolling(window=14).mean() /
@@ -110,13 +109,13 @@ with tab1:
         .abs().rolling(window=14).mean()
     )))
     
-    # Williams %R
+    # Williams %R Calculation
     company_data['Williams %R'] = (
         (company_data['high'].rolling(14).max() - company_data['Close']) /
         (company_data['high'].rolling(14).max() - company_data['low'].rolling(14).min())
     ) * -100
     
-    # Bollinger Bands
+    # Bollinger Bands Calculation
     company_data['SMA_20'] = company_data['Close'].rolling(window=20).mean()
     company_data['Upper_Band'] = company_data['SMA_20'] + (company_data['Close'].rolling(window=20).std() * 2)
     company_data['Lower_Band'] = company_data['SMA_20'] - (company_data['Close'].rolling(window=20).std() * 2)
@@ -191,10 +190,10 @@ with tab2:
     st.write("📄 **Prediction Summary:**")
     st.write(summary)
     
+    # Instead of using the 'closed' parameter, start the forecast one day after the last date.
     forecast_index = pd.date_range(
-        start=company_data.index[-1],
-        periods=forecast_days+1,
-        closed='right'
+        start=company_data.index[-1] + pd.Timedelta(days=1),
+        periods=forecast_days
     )
     forecast_df = pd.DataFrame({
         "Date": forecast_index,
