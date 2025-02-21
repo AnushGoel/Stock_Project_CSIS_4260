@@ -11,7 +11,7 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.preprocessing import MinMaxScaler
 import time
 
-# Load Parquet File Instead of CSV
+# Load Parquet File
 @st.cache_data
 def load_stock_data(file_path):
     df = pd.read_parquet(file_path)
@@ -21,24 +21,17 @@ def load_stock_data(file_path):
 
 df = load_stock_data('scaled_dataset_1x_snappy.parquet')
 
-# Sidebar Options
+# ✅ Use 'name' column (Correct case-sensitive name)
 st.sidebar.header("Stock Analysis Options")
-company_list = df['Name'].unique()
+company_list = df['name'].unique()
 company = st.sidebar.selectbox("Select Company", company_list)
-forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=60, step=5)
 
 # Filter Data for Selected Company
-company_data = df[df['Name'] == company]
+company_data = df[df['name'] == company]
 
 # Display Stock Data
 st.write(f"### Stock Data for {company}")
 st.dataframe(company_data.tail(10))
-
-# Moving Averages
-def add_moving_averages(data, short_window=20, long_window=50):
-    data['SMA'] = data['Close'].rolling(window=short_window).mean()
-    data['LMA'] = data['Close'].rolling(window=long_window).mean()
-    return data
 
 # Candlestick Chart
 def candlestick_chart(data):
@@ -82,25 +75,20 @@ def train_lstm_model(data, forecast_days):
     return model, scaler
 
 # User Selects Visualization
-plot_option = st.selectbox("Select Plot", ["Candlestick Chart", "Moving Averages", "LSTM Forecast"])
+plot_option = st.selectbox("Select Plot", ["Candlestick Chart", "LSTM Forecast"])
 
 if plot_option == "Candlestick Chart":
     candlestick_chart(company_data)
 
-elif plot_option == "Moving Averages":
-    fig = px.line(company_data, x=company_data.index, y=['Close', 'SMA', 'LMA'], 
-                  title=f"{company} Moving Averages (20 & 50 Days)")
-    st.plotly_chart(fig)
-
 elif plot_option == "LSTM Forecast":
     st.write("Training LSTM model, please wait...")
     start_time = time.time()
-    model, scaler = train_lstm_model(company_data, forecast_days)
+    model, scaler = train_lstm_model(company_data, forecast_days=30)
     end_time = time.time()
     st.success(f"LSTM Model Trained in {round(end_time - start_time, 2)} seconds!")
 
-    future_predictions = model.predict(scaler.transform(company_data['Close'].values.reshape(-1, 1))[-forecast_days:])
+    future_predictions = model.predict(scaler.transform(company_data['Close'].values.reshape(-1, 1))[-30:])
     
     # Display Forecast
-    st.write(f"### {forecast_days}-Day Forecast for {company}")
+    st.write(f"### 30-Day Forecast for {company}")
     st.line_chart(future_predictions)
