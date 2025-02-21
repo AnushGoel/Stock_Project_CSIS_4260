@@ -10,6 +10,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from datetime import timedelta
 from sklearn.preprocessing import MinMaxScaler
 from textblob import TextBlob
+from plotly.subplots import make_subplots  # ✅ Fix: Added missing import
 
 # ========================== Theme Toggle (Dark/Light Mode) ==========================
 theme_mode = st.sidebar.radio("🌙 Theme Mode", ["Light Mode", "Dark Mode"])
