@@ -1,16 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
 import xgboost as xgb
-import seaborn as sns
-from statsmodels.tsa.seasonal import seasonal_decompose
 from datetime import timedelta
 from sklearn.preprocessing import MinMaxScaler
-from textblob import TextBlob
-from plotly.subplots import make_subplots  
+from plotly.subplots import make_subplots
 
 # ========================== Theme Toggle (Dark/Light Mode) ==========================
 theme_mode = st.sidebar.radio("🌙 Theme Mode", ["Light Mode", "Dark Mode"])
@@ -51,15 +47,22 @@ def train_xgboost_model(data, forecast_days):
     model.fit(X, y)
     return model
 
-# ========================== Trading Recommendations ==========================
-def get_stock_recommendation(prices):
-    latest_change = prices[-1] - prices[-2]
-    if latest_change > 0:
-        return "📈 **BUY** - The stock is showing an upward trend."
-    elif latest_change < 0:
-        return "📉 **SELL** - The stock is declining, consider selling."
+# ========================== Generate Summary Based on Predicted vs Past Prices ==========================
+def generate_price_summary(past_prices, predicted_prices):
+    actual_change = past_prices[-1] - past_prices[0]
+    predicted_change = predicted_prices[-1] - predicted_prices[0]
+
+    if actual_change > 0:
+        past_trend = "an upward trend"
     else:
-        return "⚖️ **HOLD** - No major movement in the stock."
+        past_trend = "a downward trend"
+
+    if predicted_change > 0:
+        future_trend = "expected to continue rising"
+    else:
+        future_trend = "expected to decline further"
+
+    return f"The stock price has shown {past_trend} over the past period. Based on the forecast, the price is {future_trend} in the upcoming days."
 
 # ========================== UI with Tabs ==========================
 tab1, tab2, tab3 = st.tabs(["📈 Stock Analysis", "🔮 Forecasted Results", "💰 Portfolio Simulator"])
@@ -67,31 +70,57 @@ tab1, tab2, tab3 = st.tabs(["📈 Stock Analysis", "🔮 Forecasted Results", "�
 with tab1:
     st.subheader(f"📊 {company} - Stock Analysis")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = px.line(company_data, x=company_data.index, y="Close", title=f"{company} Stock Closing Prices", template=theme)
-        st.plotly_chart(fig)
+    # ✅ Animated Line Chart with Confidence Intervals
+    fig_trend = px.line(company_data, x=company_data.index, y="Close", title=f"{company} Stock Price Trend", template=theme)
+    fig_trend.update_traces(line=dict(width=2), mode='lines+markers')
+    fig_trend.update_layout(hovermode="x unified")
+    st.plotly_chart(fig_trend)
 
-    with col2:
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2)
-        fig.add_trace(go.Candlestick(x=company_data.index, open=company_data['open'], high=company_data['high'],
-                                     low=company_data['low'], close=company_data['Close'], name="Candlesticks"), row=1, col=1)
-        fig.add_trace(go.Bar(x=company_data.index, y=company_data['Volume'], name="Volume"), row=2, col=1)
-        fig.update_layout(title=f"{company} Candlestick Chart", xaxis_rangeslider_visible=False, template=theme)
-        st.plotly_chart(fig)
+    # ✅ Interactive Candlestick Chart with Zoom & Pan
+    fig_candle = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2, 
+                               row_heights=[0.7, 0.3], subplot_titles=("Candlestick Chart", "Volume"))
 
-    with st.expander("📉 Stock Indicator Correlation Heatmap"):
-        # ✅ Fix: Select only numeric columns & handle NaN values
-        numeric_data = company_data.select_dtypes(include=[np.number]).dropna()
-        correlation = numeric_data.corr()
-        fig, ax = plt.subplots(figsize=(8, 5))
-        sns.heatmap(correlation, annot=True, cmap="coolwarm", ax=ax)
-        st.pyplot(fig)
+    fig_candle.add_trace(go.Candlestick(
+        x=company_data.index, open=company_data['open'], high=company_data['high'],
+        low=company_data['low'], close=company_data['Close'], name="Candlestick",
+        hoverinfo="x+open+high+low+close"), row=1, col=1)
+
+    fig_candle.add_trace(go.Bar(
+        x=company_data.index, y=company_data['Volume'], name="Volume",
+        marker_color='blue', opacity=0.6), row=2, col=1)
+
+    fig_candle.update_layout(
+        title=f"{company} Candlestick Chart",
+        xaxis_rangeslider_visible=True,
+        template=theme,
+        hovermode="x unified"
+    )
+    st.plotly_chart(fig_candle)
+
+    # ✅ Technical Indicators - RSI, MACD, Williams %R, Bollinger Bands
+    company_data['RSI'] = 100 - (100 / (1 + (company_data['Close'].diff().where(company_data['Close'].diff() > 0, 0)
+                                             .rolling(window=14).mean() /
+                                             company_data['Close'].diff().where(company_data['Close'].diff() < 0, 0)
+                                             .abs().rolling(window=14).mean())))
+
+    company_data['Williams %R'] = ((company_data['high'].rolling(14).max() - company_data['Close']) /
+                                   (company_data['high'].rolling(14).max() - company_data['low'].rolling(14).min())) * -100
+
+    company_data['SMA_20'] = company_data['Close'].rolling(window=20).mean()
+    company_data['Upper_Band'] = company_data['SMA_20'] + (company_data['Close'].rolling(window=20).std() * 2)
+    company_data['Lower_Band'] = company_data['SMA_20'] - (company_data['Close'].rolling(window=20).std() * 2)
+
+    fig_rsi = px.line(company_data, x=company_data.index, y="RSI", title="RSI (Relative Strength Index)", template=theme)
+    fig_williams = px.line(company_data, x=company_data.index, y="Williams %R", title="Williams %R Indicator", template=theme)
+    fig_bollinger = px.line(company_data, x=company_data.index, y=["Close", "Upper_Band", "Lower_Band"], title="Bollinger Bands", template=theme)
+
+    st.plotly_chart(fig_rsi)
+    st.plotly_chart(fig_williams)
+    st.plotly_chart(fig_bollinger)
 
 with tab2:
     st.subheader("🔮 Stock Price Forecast")
     st.write(f"📅 Forecasting **{forecast_days} days** ahead for **{company}**.")
-    st.write("🔄 Training XGBoost model, please wait...")
     
     model = train_xgboost_model(company_data, forecast_days)
     future_predictions = []
@@ -103,21 +132,8 @@ with tab2:
         input_data = np.roll(input_data, -1)
         input_data[0, -1] = pred
 
-    future_dates = [(company_data.index[-1] + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(1, len(future_predictions) + 1)]
-    forecast_df = pd.DataFrame({'Date': future_dates, 'Predicted Close Price': future_predictions})
-    st.dataframe(forecast_df)
+    summary = generate_price_summary(company_data['Close'].values[-forecast_days:], future_predictions)
 
-    fig_forecast = px.line(forecast_df, x="Date", y="Predicted Close Price", title="Predicted Stock Price Over Time", template=theme)
-    st.plotly_chart(fig_forecast)
+    st.write("📄 **Prediction Summary:**")
+    st.write(summary)
 
-    st.subheader("📊 Trading Recommendation")
-    st.write(get_stock_recommendation(future_predictions))
-
-with tab3:
-    st.subheader("💰 Portfolio Growth Simulator")
-    investment = st.number_input("Initial Investment Amount ($)", min_value=100, max_value=1000000, step=1000, value=10000)
-    growth_rate = (future_predictions[-1] - future_predictions[0]) / future_predictions[0] * 100  
-    final_value = investment * (1 + (growth_rate / 100))
-
-    st.write(f"📈 **Expected Investment Value After {forecast_days} Days:** **${round(final_value, 2)}**")
-    st.write(f"📊 **Stock Growth Rate:** {round(growth_rate, 2)}%")
