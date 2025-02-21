@@ -16,7 +16,7 @@ This project integrates **research, benchmarking, and coding** using a time-seri
 
 ## 🛠️ Project Parts
 
-### 🔹 Part 1: Data Storage & Retrieval
+### 🔹 Part 1: Data Storage & Retrieval ([📂 View Part A](https://github.com/AnushGoel/Stock_Project_CSIS_4290/blob/main/PartA.ipynb))
 
 **Goal:** Optimize data storage by choosing between **CSV** and **Parquet**.
 
@@ -27,7 +27,7 @@ This project integrates **research, benchmarking, and coding** using a time-seri
 
 ---
 
-### 🔹 Part 2: Data Analysis & Prediction Models
+### 🔹 Part 2: Data Analysis & Prediction Models ([📂 View Part B](https://github.com/AnushGoel/Stock_Project_CSIS_4290/blob/main/PartB.ipynb))
 
 **Goal:** Compare **Pandas** vs. **Polars** for data analysis and prediction modeling.
 
@@ -39,7 +39,7 @@ This project integrates **research, benchmarking, and coding** using a time-seri
 
 ---
 
-### 🔹 Part 3: Dashboard Development
+### 🔹 Part 3: Dashboard Development ([🌐 View Streamlit Dashboard](https://mainpy-9fhvfvvqepopz9oz9jebvm.streamlit.app/#9ed967a8))
 
 **Goal:** Build an interactive **dashboard** to visualize benchmarking and prediction results.
 
