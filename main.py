@@ -81,7 +81,9 @@ with tab1:
         st.plotly_chart(fig)
 
     with st.expander("📉 Stock Indicator Correlation Heatmap"):
-        correlation = company_data.corr()
+        # ✅ Fix: Select only numeric columns before calculating correlation
+        numeric_data = company_data.select_dtypes(include=[np.number])
+        correlation = numeric_data.corr()
         fig, ax = plt.subplots(figsize=(8, 5))
         sns.heatmap(correlation, annot=True, cmap="coolwarm", ax=ax)
         st.pyplot(fig)
