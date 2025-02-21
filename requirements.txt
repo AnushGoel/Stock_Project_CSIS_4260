@@ -1,11 +1,7 @@
 streamlit
 pandas
 numpy
-matplotlib
 plotly
 xgboost
-statsmodels
-scikit-learn
 pyarrow
-textblob
-seaborn
+
