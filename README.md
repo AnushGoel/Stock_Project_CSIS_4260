@@ -1,28 +1,63 @@
-# Stock_Project_CSIS_4290
-Douglas College CSIS-4290 Assignment 1
+# 📈 CSIS 4260 – Assignment 1: Stock Price Analysis & Prediction Dashboard
 
-## CSIS 4260 – Assignment 1: Stock Price Analysis & Prediction
-Overview
-This project combines research, benchmarking, and coding using a time-series dataset of daily stock prices for 505 S&P 500 companies (2013-02-08 to 2018-02-07). We evaluate three data scales: 1x, 10x, and 100x.
+## 📌 Overview
 
-Dataset
-Content: Daily stock prices (619,040 rows; ~29MB in CSV)
-Alternative: Convert to Parquet with compression (Apache Parquet)
-Parts
-1. Data Storage & Retrieval
-Goal: Decide between CSV and Parquet.
-Tasks:
-Benchmark read/write performance at scales 1x, 10x, and 100x.
-Evaluate performance, usability, and scalability.
-2. Data Analysis & Prediction Models
-Goal: Compare Pandas vs. Polars while enhancing and analyzing the dataset.
-Tasks:
-Compute and add at least four technical indicators (see Investopedia).
-Benchmark data processing performance.
-Develop two prediction models for next-day closing prices using an 80-20 train-test split.
-3. Dashboard Creation
-Goal: Build an interactive dashboard displaying benchmark results and prediction outcomes.
-Tasks:
-Section A: Visualize benchmarking results for storage and dataframe performance.
-Section B: Display prediction models with dynamic company ticker selection.
-Research dashboard libraries (e.g., Streamlit, Dash, Reflex).
+This project integrates **research, benchmarking, and coding** using a time-series dataset of **daily stock prices** for **505 S&P 500 companies** (2013-02-08 to 2018-02-07). The assignment is divided into three parts, analyzing performance at **1x, 10x, and 100x** data scales.
+
+## 📊 Dataset
+
+- **Source:** S&P 500 stock prices  
+- **Size:** 619,040 rows (~29MB CSV)  
+- **Formats:**  
+  - **CSV:** Original format  
+  - **Parquet:** Possible conversion with compression ([Apache Parquet](https://arrow.apache.org/docs/python/parquet.html))
+
+---
+
+## 🛠️ Project Parts
+
+### 🔹 Part 1: Data Storage & Retrieval
+
+**Goal:** Optimize data storage by choosing between **CSV** and **Parquet**.
+
+**Tasks:**
+- Compare **read/write performance** at **1x, 10x, and 100x** scales.
+- Assess performance, usability, and scalability.
+- Recommend the best format based on benchmarking.
+
+---
+
+### 🔹 Part 2: Data Analysis & Prediction Models
+
+**Goal:** Compare **Pandas** vs. **Polars** for data analysis and prediction modeling.
+
+**Tasks:**
+- Add **4+ technical indicators** (see [Investopedia](https://www.investopedia.com/terms/t/technicalindicator.asp)).
+- Benchmark **data processing speed** using Pandas vs. Polars.
+- Implement **two ML models** to predict next-day closing prices.
+- Use an **80-20 train-test split** for backtesting.
+
+---
+
+### 🔹 Part 3: Dashboard Development
+
+**Goal:** Build an interactive **dashboard** to visualize benchmarking and prediction results.
+
+**Tasks:**
+- **Section A:** Display **storage and dataframe performance** across scales.
+- **Section B:** Enable **company ticker selection** for dynamic stock prediction visualization.
+- Research dashboard frameworks:  
+  - [Streamlit](https://streamlit.io/)  
+  - [Dash](https://plotly.com/dash/)  
+  - [Reflex](https://reflex.dev/)  
+
+---
+
+## 🚀 Getting Started
+
+### ✅ Prerequisites
+
+Ensure you have **Python 3.x** and the required libraries:
+
+```bash
+pip install pandas polars pyarrow streamlit dash reflex
