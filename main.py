@@ -12,22 +12,13 @@ from sklearn.preprocessing import MinMaxScaler
 import time
 from datetime import timedelta
 
-# ========================== UI Improvements ==========================
-st.set_page_config(page_title="Stock Forecasting App", layout="wide")
-st.markdown("""
-    <style>
-    .sidebar .sidebar-content { background-color: #f8f9fa; }
-    .css-18e3th9 { padding: 20px; }
-    h1 { color: #1f77b4; text-align: center; }
-    </style>
-""", unsafe_allow_html=True)
-
-# ========================== Load Parquet File ==========================
+# ========================== Load Parquet File with Fix ==========================
 @st.cache_data
 def load_stock_data(file_path):
     df = pd.read_parquet(file_path)
     df.rename(columns={'date': 'Date', 'close': 'Close', 'volume': 'Volume'}, inplace=True)
-    df.set_index('Date', inplace=True)
+    df['Date'] = pd.to_datetime(df['Date'])  # ✅ Convert Date to datetime
+    df.set_index('Date', inplace=True)  # ✅ Set datetime index
     return df
 
 df = load_stock_data('scaled_dataset_1x_snappy.parquet')
@@ -47,37 +38,8 @@ forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=60, s
 # Filter Data for Selected Company & Time Range
 company_data = df[df['name'] == company].iloc[-time_range:]
 
-# ========================== Technical Indicators ==========================
-def add_technical_indicators(data):
-    # RSI Calculation
-    delta = data['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    data['RSI'] = 100 - (100 / (1 + rs))
-
-    # MACD Calculation
-    short_ema = data['Close'].ewm(span=12, adjust=False).mean()
-    long_ema = data['Close'].ewm(span=26, adjust=False).mean()
-    data['MACD'] = short_ema - long_ema
-    data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
-
-    # Bollinger Bands
-    data['SMA_20'] = data['Close'].rolling(window=20).mean()
-    data['Upper_Band'] = data['SMA_20'] + (data['Close'].rolling(window=20).std() * 2)
-    data['Lower_Band'] = data['SMA_20'] - (data['Close'].rolling(window=20).std() * 2)
-
-    # Stochastic Oscillator
-    data['14-high'] = data['Close'].rolling(window=14).max()
-    data['14-low'] = data['Close'].rolling(window=14).min()
-    data['%K'] = (data['Close'] - data['14-low']) / (data['14-high'] - data['14-low']) * 100
-
-    # On-Balance Volume (OBV)
-    data['OBV'] = (np.sign(data['Close'].diff()) * data['Volume']).fillna(0).cumsum()
-
-    return data
-
-company_data = add_technical_indicators(company_data)
+# ✅ Ensure 'Date' is a datetime index for forecasting
+company_data.index = pd.to_datetime(company_data.index)
 
 # ========================== LSTM Model ==========================
 def create_lstm_model(input_shape, units=50, dropout_rate=0.2):
@@ -108,7 +70,7 @@ def train_lstm_model(data, forecast_days):
 
 # ========================== Visualization Selection ==========================
 st.subheader(f"📈 {company} - Stock Analysis")
-plot_option = st.selectbox("Select Plot", ["Candlestick Chart", "RSI & MACD", "Bollinger Bands", "LSTM Forecast"])
+plot_option = st.selectbox("Select Plot", ["Candlestick Chart", "LSTM Forecast"])
 
 if plot_option == "Candlestick Chart":
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2)
@@ -118,20 +80,20 @@ if plot_option == "Candlestick Chart":
     fig.update_layout(title=f"{company} Candlestick Chart", xaxis_rangeslider_visible=False)
     st.plotly_chart(fig)
 
-elif plot_option == "RSI & MACD":
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2)
-    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['RSI'], mode='lines', name="RSI"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['MACD'], mode='lines', name="MACD"), row=2, col=1)
-    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['Signal'], mode='lines', name="Signal"), row=2, col=1)
-    st.plotly_chart(fig)
-
 elif plot_option == "LSTM Forecast":
     st.write("Training LSTM model, please wait...")
     model, scaler = train_lstm_model(company_data, forecast_days)
-    future_dates = [company_data.index[-1] + timedelta(days=i) for i in range(1, forecast_days + 1)]
+    
+    # ✅ Generate future dates based on last available date
+    last_date = company_data.index[-1]
+    future_dates = [last_date + timedelta(days=i) for i in range(1, forecast_days + 1)]
+    
+    # ✅ Get forecasted closing prices
     future_predictions = model.predict(scaler.transform(company_data['Close'].values.reshape(-1, 1))[-forecast_days:])
+    
+    # ✅ Create forecast dataframe with Dates & Predicted Prices
     forecast_df = pd.DataFrame({'Date': future_dates, 'Predicted Close Price': future_predictions.flatten()})
-    st.write("### Forecasted Stock Prices 📊")
-    st.dataframe(forecast_df)
-    st.line_chart(forecast_df.set_index("Date"))
-
+    
+    st.write("### 📈 Forecasted Stock Prices")
+    st.dataframe(forecast_df)  # ✅ Show table with forecasted prices
+    st.line_chart(forecast_df.set_index("Date"))  # ✅ Show forecast plot
