@@ -10,8 +10,19 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.preprocessing import MinMaxScaler
 import time
+from datetime import timedelta
 
-# Load Parquet File
+# ========================== UI Improvements ==========================
+st.set_page_config(page_title="Stock Forecasting App", layout="wide")
+st.markdown("""
+    <style>
+    .sidebar .sidebar-content { background-color: #f8f9fa; }
+    .css-18e3th9 { padding: 20px; }
+    h1 { color: #1f77b4; text-align: center; }
+    </style>
+""", unsafe_allow_html=True)
+
+# ========================== Load Parquet File ==========================
 @st.cache_data
 def load_stock_data(file_path):
     df = pd.read_parquet(file_path)
@@ -21,33 +32,54 @@ def load_stock_data(file_path):
 
 df = load_stock_data('scaled_dataset_1x_snappy.parquet')
 
-# ✅ Use 'name' column (Correct case-sensitive name)
-st.sidebar.header("Stock Analysis Options")
+# ========================== Sidebar Options ==========================
+st.sidebar.header("📊 Stock Analysis Options")
 company_list = df['name'].unique()
 company = st.sidebar.selectbox("Select Company", company_list)
 
-# Filter Data for Selected Company
-company_data = df[df['name'] == company]
+# Time Range Selection
+time_options = {"1 Year": 252, "6 Months": 126, "3 Months": 63, "1 Month": 21}
+selected_time_range = st.sidebar.radio("Select Time Range", list(time_options.keys()))
+time_range = time_options[selected_time_range]
 
-# Display Stock Data
-st.write(f"### Stock Data for {company}")
-st.dataframe(company_data.tail(10))
+forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=60, step=5)
 
-# Candlestick Chart
-def candlestick_chart(data):
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                        vertical_spacing=0.2, subplot_titles=('Stock Price', 'Volume'),
-                        row_width=[0.2, 0.7])
+# Filter Data for Selected Company & Time Range
+company_data = df[df['name'] == company].iloc[-time_range:]
 
-    fig.add_trace(go.Candlestick(x=data.index, open=data['open'], high=data['high'], 
-                                 low=data['low'], close=data['Close'], name="Candlesticks"), row=1, col=1)
+# ========================== Technical Indicators ==========================
+def add_technical_indicators(data):
+    # RSI Calculation
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    data['RSI'] = 100 - (100 / (1 + rs))
 
-    fig.add_trace(go.Bar(x=data.index, y=data['Volume'], name="Volume"), row=2, col=1)
+    # MACD Calculation
+    short_ema = data['Close'].ewm(span=12, adjust=False).mean()
+    long_ema = data['Close'].ewm(span=26, adjust=False).mean()
+    data['MACD'] = short_ema - long_ema
+    data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
 
-    fig.update_layout(title=f"{company} Candlestick Chart", xaxis_rangeslider_visible=False)
-    st.plotly_chart(fig)
+    # Bollinger Bands
+    data['SMA_20'] = data['Close'].rolling(window=20).mean()
+    data['Upper_Band'] = data['SMA_20'] + (data['Close'].rolling(window=20).std() * 2)
+    data['Lower_Band'] = data['SMA_20'] - (data['Close'].rolling(window=20).std() * 2)
 
-# LSTM Model
+    # Stochastic Oscillator
+    data['14-high'] = data['Close'].rolling(window=14).max()
+    data['14-low'] = data['Close'].rolling(window=14).min()
+    data['%K'] = (data['Close'] - data['14-low']) / (data['14-high'] - data['14-low']) * 100
+
+    # On-Balance Volume (OBV)
+    data['OBV'] = (np.sign(data['Close'].diff()) * data['Volume']).fillna(0).cumsum()
+
+    return data
+
+company_data = add_technical_indicators(company_data)
+
+# ========================== LSTM Model ==========================
 def create_lstm_model(input_shape, units=50, dropout_rate=0.2):
     model = Sequential([
         LSTM(units, activation='relu', return_sequences=True, input_shape=input_shape),
@@ -69,26 +101,37 @@ def train_lstm_model(data, forecast_days):
         y.append(scaled_data[i+forecast_days])
 
     X, y = np.array(X), np.array(y)
-    
+
     model = create_lstm_model(input_shape=(X.shape[1], 1))
     model.fit(X, y, epochs=20, batch_size=32, verbose=0)
     return model, scaler
 
-# User Selects Visualization
-plot_option = st.selectbox("Select Plot", ["Candlestick Chart", "LSTM Forecast"])
+# ========================== Visualization Selection ==========================
+st.subheader(f"📈 {company} - Stock Analysis")
+plot_option = st.selectbox("Select Plot", ["Candlestick Chart", "RSI & MACD", "Bollinger Bands", "LSTM Forecast"])
 
 if plot_option == "Candlestick Chart":
-    candlestick_chart(company_data)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2)
+    fig.add_trace(go.Candlestick(x=company_data.index, open=company_data['open'], high=company_data['high'],
+                                 low=company_data['low'], close=company_data['Close'], name="Candlesticks"), row=1, col=1)
+    fig.add_trace(go.Bar(x=company_data.index, y=company_data['Volume'], name="Volume"), row=2, col=1)
+    fig.update_layout(title=f"{company} Candlestick Chart", xaxis_rangeslider_visible=False)
+    st.plotly_chart(fig)
+
+elif plot_option == "RSI & MACD":
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2)
+    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['RSI'], mode='lines', name="RSI"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['MACD'], mode='lines', name="MACD"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=company_data.index, y=company_data['Signal'], mode='lines', name="Signal"), row=2, col=1)
+    st.plotly_chart(fig)
 
 elif plot_option == "LSTM Forecast":
     st.write("Training LSTM model, please wait...")
-    start_time = time.time()
-    model, scaler = train_lstm_model(company_data, forecast_days=30)
-    end_time = time.time()
-    st.success(f"LSTM Model Trained in {round(end_time - start_time, 2)} seconds!")
+    model, scaler = train_lstm_model(company_data, forecast_days)
+    future_dates = [company_data.index[-1] + timedelta(days=i) for i in range(1, forecast_days + 1)]
+    future_predictions = model.predict(scaler.transform(company_data['Close'].values.reshape(-1, 1))[-forecast_days:])
+    forecast_df = pd.DataFrame({'Date': future_dates, 'Predicted Close Price': future_predictions.flatten()})
+    st.write("### Forecasted Stock Prices 📊")
+    st.dataframe(forecast_df)
+    st.line_chart(forecast_df.set_index("Date"))
 
-    future_predictions = model.predict(scaler.transform(company_data['Close'].values.reshape(-1, 1))[-30:])
-    
-    # Display Forecast
-    st.write(f"### 30-Day Forecast for {company}")
-    st.line_chart(future_predictions)
