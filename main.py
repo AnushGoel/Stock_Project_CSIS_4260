@@ -44,9 +44,9 @@ for col in numeric_columns:
     if col in company_data.columns:
         company_data[col] = pd.to_numeric(company_data[col], errors='coerce')
 
-# ========================== Prepare Data for Candlestick Chart ==========================
+# ========================== Prepare Data for OHLC Chart ==========================
 # Drop any rows with missing OHLC values to prevent plotting errors.
-candlestick_data = company_data.dropna(subset=['open', 'high', 'low', 'Close'])
+ohlc_data = company_data.dropna(subset=['open', 'high', 'low', 'Close'])
 
 # ========================== UI with Tabs ==========================
 tab1, tab2, tab3 = st.tabs(["📈 Stock Analysis", "🔮 Forecasted Results", "💰 Portfolio Simulator"])
@@ -66,45 +66,40 @@ with tab1:
     fig_trend.update_layout(hovermode="x unified")
     st.plotly_chart(fig_trend, use_container_width=True)
     
-    # --- Candlestick Chart with Volume ---
-    dates = candlestick_data.index  # already in datetime format
-    fig_candle = make_subplots(
+    # --- OHLC Chart with Volume ---
+    # Using go.Ohlc instead of go.Candlestick for an alternative visualization.
+    fig_ohlc = make_subplots(
         rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2,
         row_heights=[0.7, 0.3],
-        subplot_titles=("Candlestick Chart", "Volume")
+        subplot_titles=("OHLC Chart", "Volume")
     )
     
-    fig_candle.add_trace(go.Candlestick(
-        x=dates,
-        open=candlestick_data['open'],
-        high=candlestick_data['high'],
-        low=candlestick_data['low'],
-        close=candlestick_data['Close'],
-        name="Candlestick",
-        hovertemplate=(
-            "Date: %{x}<br>" +
-            "Open: %{open}<br>" +
-            "High: %{high}<br>" +
-            "Low: %{low}<br>" +
-            "Close: %{close}<extra></extra>"
-        )
+    fig_ohlc.add_trace(go.Ohlc(
+        x=ohlc_data.index,
+        open=ohlc_data['open'],
+        high=ohlc_data['high'],
+        low=ohlc_data['low'],
+        close=ohlc_data['Close'],
+        increasing_line_color='green',
+        decreasing_line_color='red',
+        name="OHLC"
     ), row=1, col=1)
     
-    fig_candle.add_trace(go.Bar(
-        x=dates,
-        y=candlestick_data['Volume'],
-        name="Volume",
+    fig_ohlc.add_trace(go.Bar(
+        x=ohlc_data.index,
+        y=ohlc_data['Volume'],
         marker_color='blue',
-        opacity=0.6
+        opacity=0.6,
+        name="Volume"
     ), row=2, col=1)
     
-    fig_candle.update_layout(
-        title=f"{company} Candlestick Chart",
+    fig_ohlc.update_layout(
+        title=f"{company} OHLC Chart",
         xaxis_rangeslider_visible=True,
         template=theme,
         hovermode="x unified"
     )
-    st.plotly_chart(fig_candle, use_container_width=True)
+    st.plotly_chart(fig_ohlc, use_container_width=True)
     
     # --- Technical Indicators ---
     # RSI
