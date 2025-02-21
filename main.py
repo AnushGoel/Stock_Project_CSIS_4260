@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 import xgboost as xgb
 from statsmodels.tsa.seasonal import seasonal_decompose
 from datetime import timedelta
@@ -14,7 +15,7 @@ from sklearn.preprocessing import MinMaxScaler
 def load_stock_data(file_path):
     df = pd.read_parquet(file_path)
     df.rename(columns={'date': 'Date', 'close': 'Close', 'volume': 'Volume'}, inplace=True)
-    df['Date'] = pd.to_datetime(df['Date'])
+    df['Date'] = pd.to_datetime(df['Date']).dt.date  # ✅ Convert Date to date only (No time)
     df.set_index('Date', inplace=True)
     return df
 
@@ -35,6 +36,30 @@ forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=126, 
 
 # Filter Data for Selected Company
 company_data = df[df['name'] == company]
+
+# ========================== Technical Indicators ==========================
+def add_technical_indicators(data):
+    # RSI Calculation
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    data['RSI'] = 100 - (100 / (1 + rs))
+
+    # MACD Calculation
+    short_ema = data['Close'].ewm(span=12, adjust=False).mean()
+    long_ema = data['Close'].ewm(span=26, adjust=False).mean()
+    data['MACD'] = short_ema - long_ema
+    data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
+
+    # Bollinger Bands
+    data['SMA_20'] = data['Close'].rolling(window=20).mean()
+    data['Upper_Band'] = data['SMA_20'] + (data['Close'].rolling(window=20).std() * 2)
+    data['Lower_Band'] = data['SMA_20'] - (data['Close'].rolling(window=20).std() * 2)
+
+    return data
+
+company_data = add_technical_indicators(company_data)
 
 # ========================== Faster XGBoost Model for Forecasting ==========================
 def train_xgboost_model(data, forecast_days):
@@ -66,15 +91,32 @@ with tab1:
     fig.update_layout(title=f"{company} Candlestick Chart", xaxis_rangeslider_visible=False)
     st.plotly_chart(fig)
 
-    # Seasonal Decomposition Plot
+    # RSI, MACD, and Bollinger Bands
+    st.subheader("📉 Technical Indicators")
+
+    # RSI
+    fig_rsi = px.line(company_data, x=company_data.index, y="RSI", title="RSI (Relative Strength Index)")
+    st.plotly_chart(fig_rsi)
+
+    # MACD
+    fig_macd = px.line(company_data, x=company_data.index, y=["MACD", "Signal"], title="MACD Indicator")
+    st.plotly_chart(fig_macd)
+
+    # Bollinger Bands
+    fig_bbands = px.line(company_data, x=company_data.index, y=["Close", "Upper_Band", "Lower_Band"], title="Bollinger Bands")
+    st.plotly_chart(fig_bbands)
+
+    # Seasonal Decomposition Plot (Fixed Size)
+    st.subheader("📊 Seasonal Trend Analysis")
     decomposition = seasonal_decompose(company_data['Close'], model='multiplicative', period=30)
-    fig, axs = plt.subplots(3, figsize=(12, 8))
+    fig, axs = plt.subplots(3, figsize=(12, 6))
     axs[0].plot(decomposition.trend, label="Trend")
     axs[0].set_title("Stock Price Trend")
     axs[1].plot(decomposition.seasonal, label="Seasonality")
     axs[1].set_title("Stock Seasonality")
     axs[2].plot(decomposition.resid, label="Residual")
     axs[2].set_title("Stock Residual")
+    plt.tight_layout()  # ✅ Fix overlaying issue
     st.pyplot(fig)
 
 with tab2:
@@ -97,8 +139,9 @@ with tab2:
         input_data = np.roll(input_data, -1)
         input_data[0, -1] = pred
 
-    # ✅ Ensure `future_dates` matches the length of `future_predictions`
-    future_dates = [company_data.index[-1] + timedelta(days=i) for i in range(1, len(future_predictions) + 1)]
+    # ✅ Ensure `future_dates` has only DATE (no time)
+    future_dates = [(company_data.index[-1] + timedelta(days=i)) for i in range(1, len(future_predictions) + 1)]
+    future_dates = [date.strftime('%Y-%m-%d') for date in future_dates]  # ✅ Convert to string format
 
     # ✅ Create forecast dataframe
     forecast_df = pd.DataFrame({'Date': future_dates, 'Predicted Close Price': future_predictions})
