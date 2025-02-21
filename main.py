@@ -10,7 +10,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from datetime import timedelta
 from sklearn.preprocessing import MinMaxScaler
 from textblob import TextBlob
-from plotly.subplots import make_subplots  # ✅ Fix: Added missing import
+from plotly.subplots import make_subplots  
 
 # ========================== Theme Toggle (Dark/Light Mode) ==========================
 theme_mode = st.sidebar.radio("🌙 Theme Mode", ["Light Mode", "Dark Mode"])
@@ -81,8 +81,8 @@ with tab1:
         st.plotly_chart(fig)
 
     with st.expander("📉 Stock Indicator Correlation Heatmap"):
-        # ✅ Fix: Select only numeric columns before calculating correlation
-        numeric_data = company_data.select_dtypes(include=[np.number])
+        # ✅ Fix: Select only numeric columns & handle NaN values
+        numeric_data = company_data.select_dtypes(include=[np.number]).dropna()
         correlation = numeric_data.corr()
         fig, ax = plt.subplots(figsize=(8, 5))
         sns.heatmap(correlation, annot=True, cmap="coolwarm", ax=ax)
