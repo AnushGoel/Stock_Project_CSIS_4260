@@ -7,3 +7,4 @@ xgboost
 statsmodels
 scikit-learn
 pyarrow
+textblob
