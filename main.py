@@ -4,7 +4,6 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import xgboost as xgb
-from datetime import timedelta
 from plotly.subplots import make_subplots
 
 # ========================== Theme Toggle (Dark/Light Mode) ==========================
@@ -15,9 +14,9 @@ theme = "plotly_dark" if theme_mode == "Dark Mode" else "plotly_white"
 @st.cache_data
 def load_stock_data(file_path):
     df = pd.read_parquet(file_path)
-    # Rename columns as needed. Adjust names if your file uses different cases.
+    # Rename columns as needed. Adjust if your file uses different cases.
     df.rename(columns={'date': 'Date', 'close': 'Close', 'volume': 'Volume'}, inplace=True)
-    # Convert Date column to datetime and then to Python date objects.
+    # Convert Date column to datetime and then to date objects
     df['Date'] = pd.to_datetime(df['Date']).dt.date  
     df.set_index('Date', inplace=True)
     return df
@@ -26,10 +25,7 @@ df = load_stock_data('scaled_dataset_1x_snappy.parquet')
 
 # ========================== Filter Companies with at Least 6 Months of Data ==========================
 min_required_days = 126  # Approximately 6 months of trading days
-valid_companies = [
-    company for company in df['name'].unique()
-    if len(df[df['name'] == company]) >= min_required_days
-]
+valid_companies = [company for company in df['name'].unique() if len(df[df['name'] == company]) >= min_required_days]
 df = df[df['name'].isin(valid_companies)]
 
 # ========================== Sidebar Options ==========================
@@ -38,6 +34,13 @@ company_list = valid_companies
 company = st.sidebar.selectbox("Select Company", company_list)
 forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=126, step=5)
 company_data = df[df['name'] == company].sort_index()
+
+# Ensure that OHLC and Volume columns are numeric.
+# If your dataset has different column names for open, high, or low, adjust accordingly.
+numeric_columns = ['open', 'high', 'low', 'Close', 'Volume']
+for col in numeric_columns:
+    if col in company_data.columns:
+        company_data[col] = pd.to_numeric(company_data[col], errors='coerce')
 
 # ========================== Faster XGBoost Model for Forecasting ==========================
 def train_xgboost_model(data, forecast_days):
@@ -81,7 +84,7 @@ with tab1:
     st.plotly_chart(fig_trend, use_container_width=True)
 
     # Interactive Candlestick Chart with Volume
-    # Convert index (which is of type date) to datetime for Plotly compatibility.
+    # Convert index (which is a date) to datetime for Plotly
     dates = pd.to_datetime(company_data.index)
     fig_candle = make_subplots(
         rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.2, 
@@ -168,7 +171,6 @@ with tab2:
     st.write(f"📅 Forecasting **{forecast_days} days** ahead for **{company}**.")
     
     model = train_xgboost_model(company_data, forecast_days)
-    
     future_predictions = []
     input_data = company_data['Close'].values[-forecast_days:].reshape(1, -1)
     
