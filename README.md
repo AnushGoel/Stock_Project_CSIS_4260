@@ -132,5 +132,5 @@ This project is licensed under the **MIT License**.
 ## 📢 Acknowledgments
 
 - **Course:** CSIS 4260  
-- **Instructor:** [Instructor Name]  
+- **Instructor:** Nikhil Bhardwaj 
 - **Dataset:** Provided by the course  
