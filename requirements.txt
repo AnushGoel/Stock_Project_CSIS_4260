@@ -2,5 +2,5 @@ streamlit>=1.10
 pandas>=1.3
 numpy>=1.21
 plotly>=5.0
-xgboost>=1.7.5
+xgboost @ git+https://github.com/dmlc/xgboost.git
 pyarrow>=8.0
