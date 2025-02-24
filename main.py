@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-import xgboost as xgb
 from plotly.subplots import make_subplots
+from statsmodels.tsa.ar_model import AutoReg
 
 # ========================== Theme Toggle (Dark/Light Mode) ==========================
 theme_mode = st.sidebar.radio("🌙 Theme Mode", ["Light Mode", "Dark Mode"])
@@ -36,6 +36,8 @@ st.sidebar.header("📊 Stock Analysis Options")
 company_list = valid_companies
 company = st.sidebar.selectbox("Select Company", company_list)
 forecast_days = st.sidebar.slider("Forecast Days", min_value=10, max_value=126, step=5)
+# Add a slider to choose the AR model lag order (number of past days to use)
+ar_lags = st.sidebar.slider("AR Model Lags", min_value=1, max_value=30, value=14, step=1)
 company_data = df[df['name'] == company].sort_index()
 
 # ========================== Ensure Numeric Data for OHLC & Volume ==========================
@@ -59,27 +61,10 @@ def generate_price_summary(past_prices, predicted_prices):
         f"Based on the forecast, the price is {future_trend} in the upcoming days."
     )
 
-def train_xgboost_model(data, forecast_days):
-    data_values = data['Close'].values
-    X, y = [], []
-    for i in range(len(data_values) - forecast_days):
-        X.append(data_values[i:i+forecast_days])
-        y.append(data_values[i+forecast_days])
-    X, y = np.array(X), np.array(y)
-    # Initialize XGBoost model (using the GitHub version compatible with latest Python)
-    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
-    model.fit(X, y)
-    return model
-
-# Compute forecast predictions once so they can be used in multiple tabs.
-model = train_xgboost_model(company_data, forecast_days)
-future_predictions = []
-input_data = company_data['Close'].values[-forecast_days:].reshape(1, -1)
-for _ in range(forecast_days):
-    pred = model.predict(input_data)[0]
-    future_predictions.append(round(pred, 2))
-    input_data = np.roll(input_data, -1)
-    input_data[0, -1] = pred
+# Train an Autoregressive (AR) model using the specified lag order.
+ar_model = AutoReg(company_data['Close'].values, lags=ar_lags, old_names=False).fit()
+future_predictions = ar_model.forecast(steps=forecast_days)
+future_predictions = [round(pred, 2) for pred in future_predictions]
 
 # Build a forecast DataFrame with a date-only column.
 forecast_index = pd.date_range(
