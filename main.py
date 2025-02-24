@@ -152,7 +152,7 @@ with tab1:
     # Technical Indicators
     company_data['RSI'] = 100 - (100 / (1 + (
         company_data['Close'].diff().where(company_data['Close'].diff() > 0, 0)
-        .rolling(window=14).mean() /
+        .rolling(window=14).mean() / 
         company_data['Close'].diff().where(company_data['Close'].diff() < 0, 0)
         .abs().rolling(window=14).mean()
     )))
