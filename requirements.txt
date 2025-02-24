@@ -2,5 +2,5 @@ streamlit>=1.10
 pandas>=1.3
 numpy>=1.21
 plotly>=5.0
-xgboost
+statsmodels>=0.13
 pyarrow>=8.0
