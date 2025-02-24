@@ -66,6 +66,7 @@ def train_xgboost_model(data, forecast_days):
         X.append(data_values[i:i+forecast_days])
         y.append(data_values[i+forecast_days])
     X, y = np.array(X), np.array(y)
+    # Initialize XGBoost model (ensure compatibility with your Python version)
     model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
     model.fit(X, y)
     return model
