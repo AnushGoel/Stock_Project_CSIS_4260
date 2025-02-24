@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import xgboost as xgb
-from plotly.subplots import make_subplots 
+from plotly.subplots import make_subplots
 
 # ========================== Theme Toggle (Dark/Light Mode) ==========================
 theme_mode = st.sidebar.radio("🌙 Theme Mode", ["Light Mode", "Dark Mode"])
@@ -66,7 +66,7 @@ def train_xgboost_model(data, forecast_days):
         X.append(data_values[i:i+forecast_days])
         y.append(data_values[i+forecast_days])
     X, y = np.array(X), np.array(y)
-    # Initialize XGBoost model (ensure compatibility with Python 3.10)
+    # Initialize XGBoost model (using the GitHub version compatible with latest Python)
     model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
     model.fit(X, y)
     return model
