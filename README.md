@@ -39,7 +39,7 @@ This project integrates **research, benchmarking, and coding** using a time-seri
 
 ---
 
-### 🔹 Part 3: Dashboard Development ([🌐 View Streamlit Dashboard](https://mainpy-9fhvfvvqepopz9oz9jebvm.streamlit.app/#9ed967a8))
+### 🔹 Part 3: Dashboard Development ([🌐 View Streamlit Dashboard](https://mainpy-wtfhzjtzjedjcpsnvlgtey.streamlit.app/))
 
 **Goal:** Build an interactive **dashboard** to visualize benchmarking and prediction results.
 
