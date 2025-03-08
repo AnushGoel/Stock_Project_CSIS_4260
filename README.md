@@ -27,7 +27,7 @@ This project integrates **research, benchmarking, and coding** using a time-seri
 
 ---
 
-### 🔹 Part 2: Data Analysis & Prediction Models ([📂 View Part B](https://github.com/AnushGoel/Stock_Project_CSIS_4290/blob/main/PartB.ipynb))
+### 🔹 Part 2: Data Analysis & Prediction Models ([📂 View Part B](https://github.com/AnushGoel/Stock_Project_CSIS_4260/blob/main/PartB.ipynb))
 
 **Goal:** Compare **Pandas** vs. **Polars** for data analysis and prediction modeling.
 
